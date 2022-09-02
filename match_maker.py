@@ -1,4 +1,5 @@
 import json
+import time
 import lorem
 import base64
 import datetime
@@ -9,6 +10,7 @@ from PIL import Image
 import streamlit as st
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud, STOPWORDS
+from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode, JsCode
 
 st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Match Maker")
 
@@ -24,20 +26,77 @@ wordcloud = WordCloud(stopwords=STOPWORDS, max_font_size=50, max_words=15, backg
                       collocations=False, random_state=1).generate(your_ideal_stack_text[0])
 wordcloud.to_file("png/lorem_stack_wordcloud.png")
 
-# use bcjobs.ca api to query jobs data. Response contains only the latest 10 job ads.
-url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?'
+
 
 
 def main():
     st.title("Match Maker")
     st.subheader("Attempts to match skills to relevant job postings...")
     st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the latest job ads. 
-    The app uses the job description to generate a word cloud of the most used (default 15) non stop words and then 
-    tries to match the job ads that have a similar word cloud from the user's skill sets. 
-    Copy your stack in one of the first text area and let the app build your word cloud, then see if there is a visual
-     match. Will come up with a similarity score later... 
-    Maybe a Hu Moments based similarity score? 
+    The app uses the job description from user selected rows in the table below to generate a word cloud of the most used (default 15) words. And then, it 
+    tries to evaluate the match between the user's skills with those in the job ad. Please, copy your stack/skills list in the textbox  and let the app build your word cloud. 
+    By default, the first 3 jobs are are used to build word clouds. This  can be changed by adding/removing  jobs from the table.
+    See if there is a visual match. Will come up with a similarity score later... 
+    Maybe a Hu Moments based similarity  between the two word cloud images ? 
     """)
+    
+
+    jobs_per_query=st.sidebar.selectbox('Select number of jobs per query (default is 10. Bigger numbers take longer to get response. Smaller numbers result in more round trips to the aip. Make your call!', 
+                         [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], index=0)
+    
+    url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?page=1&pageSize={jobs_per_query}'
+
+    max_number_of_pages_to_query = st.sidebar.slider('Max number of pages to query', min_value=1, max_value=100, value=10, step=1)
+
+
+
+    st.sidebar.markdown("""---""")
+    st.sidebar.markdown("""Table layout Options, credit: [Pablo Fonseca](https://github.com/PablocFonseca/streamlit-aggrid)""") 
+    # AgGrid settings
+
+    grid_height = st.sidebar.number_input("Grid height", min_value=200, max_value=800, value=300)
+    return_mode = st.sidebar.selectbox("Return Mode", list(DataReturnMode.__members__), index=1)
+    return_mode_value = DataReturnMode.__members__[return_mode]
+    update_mode = st.sidebar.selectbox("Update Mode", list(GridUpdateMode.__members__), index=len(GridUpdateMode.__members__)-1)
+    update_mode_value = GridUpdateMode.__members__[update_mode]
+    #enterprise modules
+    enable_enterprise_modules = st.sidebar.checkbox("Enable Enterprise Modules")
+    if enable_enterprise_modules:
+        enable_sidebar =st.sidebar.checkbox("Enable grid sidebar", value=False)
+    else:
+        enable_sidebar = False
+
+    #features
+    fit_columns_on_grid_load = st.sidebar.checkbox("Fit Grid Columns on Load")
+
+    enable_selection=st.sidebar.checkbox("Enable row selection", value=True)
+    if enable_selection:
+        st.sidebar.subheader("Selection options")
+        selection_mode = st.sidebar.radio("Selection Mode", ['single','multiple'], index=1)
+
+        use_checkbox = st.sidebar.checkbox("Use check box for selection", value=True)
+        if use_checkbox:
+            groupSelectsChildren = st.sidebar.checkbox("Group checkbox select children", value=True)
+            groupSelectsFiltered = st.sidebar.checkbox("Group checkbox includes filtered", value=True)
+
+        if ((selection_mode == 'multiple') & (not use_checkbox)):
+            rowMultiSelectWithClick = st.sidebar.checkbox("Multiselect with click (instead of holding CTRL)", value=False)
+            if not rowMultiSelectWithClick:
+                suppressRowDeselection = st.sidebar.checkbox("Suppress deselection (while holding CTRL)", value=False)
+            else:
+                suppressRowDeselection=False
+
+    enable_pagination = st.sidebar.checkbox("Enable pagination", value=False)
+    if enable_pagination:
+        st.sidebar.subheader("Pagination options")
+        paginationAutoSize = st.sidebar.checkbox("Auto pagination size", value=True)
+        if not paginationAutoSize:
+            paginationPageSize = st.sidebar.number_input("Page size", value=5, min_value=0, max_value=100)
+        st.sidebar.text("___")
+
+    #------------end AgGrid settings------------------------------
+
+
 
     def make_api_call(url):
         """
@@ -121,9 +180,24 @@ def main():
 
     request_info = make_api_call(url)
     df = get_job_description(request_info)
-    tot_number_of_jobs = len(df)
 
-    filters = st.multiselect("Select phrases", keywords, default=None)
+    # st.write(request_info['paging'])
+    latest_iteration = st.empty()
+    prog_bar = st.progress(0)
+
+    while request_info['paging'].get('page') < max_number_of_pages_to_query:  # get the next 10 pages of job ads
+        request_info = make_api_call(request_info['paging'].get('next'))
+        latest_iteration.text(f'fetching page {request_info["paging"].get("page")} of {max_number_of_pages_to_query}')
+        prog_bar.progress(0 + request_info['paging'].get('page') / max_number_of_pages_to_query)
+            
+        df = df.append(get_job_description(request_info), ignore_index=True)
+        df = pd.concat([df,get_job_description(request_info)], ignore_index=True)
+        if request_info['paging'].get('next') is None:
+            break
+
+
+
+    filters = st.multiselect("Select phrases", keywords, default='Data Scientist')
 
     filters = "|".join([x.replace(" ", "") for x in filters if x]) + "|"
 
@@ -144,27 +218,46 @@ def main():
                  """)
         st.stop()
     else:
-        st.info(f"""Ⓘ {len(df)} job(s) found based on the filters used.
+        st.info(f"""Ⓘ As of {datetime.datetime.today().date()}, there are
+    {request_info['paging'].get('total')} jobs in the database. {len(df)} job(s) found based on the filters used.
                  """)
 
     def xy(df_):
         return [f'[{title}]({job_url})' for title, job_url in zip(df_.title, df_.job_url)]
 
-    df.title = xy(df[['title', 'job_url']])
 
     job_xpdr = st.expander('Latest Jobs', expanded=True)
 
     cols = job_xpdr.columns([4, 2, 2, 2, 2, 2, 2])  # (len(df.columns)+4)
 
-    dff = df.drop(columns=['job_description', 'job_url','locations','publishDate'])
-    # first write the headers
-    for i, h in enumerate(dff.columns):
-        cols[i].markdown(f'<span style="font-size:24px">{h}</span>', unsafe_allow_html=True)
+   
+    with job_xpdr:
 
-    for i, cl in enumerate(dff.columns):
+        gb_models = GridOptionsBuilder.from_dataframe(df)
+        gb_models.configure_grid_options(domLayout='normal')
+        gb_models.configure_column("title", headerCheckboxSelection = True)
+        gb_models.configure_selection('multiple', use_checkbox=True, pre_selected_rows=[0, 1, 2]) # show the first 3 rows as selected for wordcloud
+        gb_models.configure_pagination(paginationAutoPageSize=True)
 
-        for _, line in enumerate(dff[cl].values):
-            cols[i].markdown(f'<span style="font-size:16px">{line}</span>', unsafe_allow_html=True)
+
+        gridOptions_models = gb_models.build()
+        grid_response_models = AgGrid(
+            df, 
+            gridOptions=gridOptions_models,
+            height=grid_height, 
+            width='100%',
+            data_return_mode=return_mode_value, 
+            update_mode=update_mode_value,
+            fit_columns_on_grid_load=fit_columns_on_grid_load,
+            allow_unsafe_jscode=True, 
+            enable_enterprise_modules=enable_enterprise_modules
+        )
+
+        smd = grid_response_models['data']
+        selected_rows_ = grid_response_models['selected_rows']
+
+        df_show = pd.DataFrame(selected_rows_)
+
 
     st.markdown(
         f'<h6 style="color:white;font-size:24px;border-radius:0%;background-color:#754DF3;">Job Summaries & Wordclouds<br></h6></br>',
@@ -185,11 +278,11 @@ def main():
             your_true_stack_text_)
         your_true_stack_wordcloud.to_file("png/your_stack_wordcloud.png")
 
-    for i in range(len(df)):
+    for i in range(min(5,len(df_show))):
         cols = st.columns([1.45, 1.25, 1.25])
-        job_title = df['title'].values[i]
+        job_title = xy(df[['title', 'job_url']].iloc[i:i + 1])[0]
 
-        text_ = cols[0].text_area(label="Job Summary", value=df['job_description'].values[i], height=250,
+        text_ = cols[0].text_area(label="Job Summary", value=df_show['job_description'].values[i], height=250,
                                   key=f"input_area_key_{i}")
 
         if text_:
@@ -200,33 +293,27 @@ def main():
                 f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills"} ({job_title})</span>',
                 unsafe_allow_html=True)
             cols[1].markdown(
-                f'<img src="data:image/png;base64,{base64.b64encode(open("png/job_cloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
+                f'<img src="data:image/png;base64,{base64.b64encode(open("png/job_cloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
                 unsafe_allow_html=True)
 
-            cols[2].markdown(f'<span style="font-size:16px;border-radius:0%;">Your Skills </span>',
+            cols[2].markdown(f'<span style="font-size:16px;border-radius:0%;">Your Skills (copy some text in the box above) </span>',
                              unsafe_allow_html=True)
 
             if your_true_stack_text_ != "":
                 cols[2].markdown(
-                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/your_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
+                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/your_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
                     unsafe_allow_html=True)
             else:
                 cols[2].markdown(
-                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/lorem_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
+                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/lorem_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
                     unsafe_allow_html=True)
 
             st.markdown(f'<h6 style="background-color:#754DF3;"></h6>', unsafe_allow_html=True)
 
-    if st.checkbox("show raw data"):
-        df_show = df.copy()
-        df_show = df_show.to_html(escape=False)
-        st.write(df_show, unsafe_allow_html=True)
-
-    # Note
 
     st.info(f"""Ⓘ This app is still in development. The api url used is https://www.bcjobs.ca/api/v1.1/public/jobs?. 
-    It does not require any authentication but as of {datetime.datetime.today().date()} it limits the response to only 
-    {tot_number_of_jobs} jobs per query.
+    It does not require any authentication. As of {datetime.datetime.today().date()}, there are
+    {request_info['paging'].get('total')} jobs.
     """)
 
 
