@@ -125,7 +125,7 @@ def main():
 
     filters = st.multiselect("Select phrases", keywords, default=None)
 
-    filters = "|".join([x.replace(" ", "") for x in filters if x])
+    filters = "|".join([x.replace(" ", "") for x in filters if x]) + "|"
 
     add_your_own_keywords = st.text_input("Add your own key word(s) separated by a comma. eg., Data Developer, Database Administrator", value="")
     if add_your_own_keywords:
