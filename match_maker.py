@@ -18,21 +18,10 @@ keywords = [
     'Data Quality', 'Data Governance', 'Data Management', 'Data Integration', 'Data Architecture', 'Data Engineering'
 ]
 
-your_ideal_stack_text = """Statistical analysis and computing, Machine Learning, Deep Learning,
-                            Processing large data sets, 
-                            Data Visualization, Data Wrangling,Mathematics, Programming, Statistics, Big Data,
-                            Data Mining, Data Science, Data Engineering, Data Architecture, Data Analytics,
-                            Data Management,Data Governance, Data Quality, Data Integration, Data Warehousing,
-                            Data Modeling,Fundamentals of Data Science Statistics Programming knowledge 
-                            Data Manipulation and Analysis Data Visualization Machine Learning Deep Learning Big Data
-                            software Engineering Model Deployment Communication Skills
-                            Storytelling Skills Structured Thinking
-                            Curiosity Creativity
-                            Problem Solving Critical Thinking
-                        """ + " ".join(lorem.paragraph().split(" "))
+your_ideal_stack_text =  [lorem.paragraph() for _ in range(2)]
 
 wordcloud = WordCloud(stopwords=STOPWORDS, max_font_size=50, max_words=15, background_color="#F1F1F1", colormap='Set2',
-                      collocations=False, random_state=1).generate(your_ideal_stack_text)
+                      collocations=False, random_state=1).generate(your_ideal_stack_text[0])
 wordcloud.to_file("png/lorem_stack_wordcloud.png")
 
 # use bcjobs.ca api to query jobs data. Response contains only the latest 10 job ads.
@@ -43,7 +32,7 @@ def main():
     st.title("Match Maker")
     st.subheader("Attempts to match skills to relevant job postings...")
     st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the latest job ads. 
-    The app uses the job description to generate a word cloud of the most used (default 15 ) non stop words and then 
+    The app uses the job description to generate a word cloud of the most used (default 15) non stop words and then 
     tries to match the job ads that have a similar word cloud from the user's skill sets. 
     Copy your stack in one of the first text area and let the app build your word cloud, then see if there is a visual
      match. Will come up with a similarity score later... 
@@ -90,16 +79,41 @@ def main():
             soup = bs.BeautifulSoup(r.text, 'lxml')
             meta_data = soup.find('div', class_="clearfix u_mt-md")
             try:
-                position_type, posted = meta_data.text.split('Details')[1].strip().split(
-                    '\n\n\n')  # get the position type and posted date
-                df_.loc[i_, 'position_type'] = position_type.strip()
-                df_.loc[i_, 'posted'] = posted.strip()
-            except:
+                salary_amount= meta_data.text.split('Salary')[1].strip().split('\n')[0].strip()
+            except IndexError:
+                salary_amount = 'N/A'
                 pass
 
+            try:
+                location= meta_data.text.split('Location')[1].strip().split('\n')[0].strip()
+            except IndexError:
+                location = 'N/A'
+                pass
+
+            try:
+                position_type, posted = meta_data.text.split('Details')[1].strip().split(
+                    '\n\n\n')  # get the position type and posted date
+            except ValueError:
+                position_type, posted = 'N/A', 'N/A'
+                pass
+
+            try:
+                category = soup.find_all('a',class_="rf_tag u_mb-xxs u_mr-xxs")[-1].text.strip('\n')
+            except IndexError:
+                category = 'N/A'
+                pass
+
+
+            df_.loc[i_, 'position'] = position_type
+            df_.loc[i_, 'location'] = location
+            df_.loc[i_, 'posted'] = posted.strip()
             job_desc = soup.find('div', class_='clearfix u_text--90 u_mb-base u_overflow-hidden').text
             df_.loc[i_, 'job_description'] = job_desc
             df_.loc[i_, 'job_url'] = job_url
+            df_.loc[i_, 'category'] = category
+            df_.loc[i_, 'salary'] = salary_amount
+
+            
 
         df_.drop(columns=['url'], inplace=True)
 
@@ -136,9 +150,9 @@ def main():
 
     job_xpdr = st.expander('Latest Jobs', expanded=True)
 
-    cols = job_xpdr.columns([4, 2, 2, 2, 2, 2])  # (len(df.columns)+4)
+    cols = job_xpdr.columns([4, 2, 2, 2, 2, 2, 2])  # (len(df.columns)+4)
 
-    dff = df.drop(columns=['job_description', 'job_url'])
+    dff = df.drop(columns=['job_description', 'job_url','locations','publishDate'])
     # first write the headers
     for i, h in enumerate(dff.columns):
         cols[i].markdown(f'<span style="font-size:24px">{h}</span>', unsafe_allow_html=True)
@@ -154,10 +168,9 @@ def main():
     word_max = st.slider('Wordcloud Max', min_value=10, max_value=45, value=15, step=5)
 
     st.write(f"""Copy text containing your skills, experience, etc. in the text box below. 
-                                            By default, a random word list is generated using some common data science 
-                                            skills plus some noise (see lorem). 
-                                             The app will generate a wordcloud of the most used words in your text. 
-                                             The wordcloud will be used to match your skills with the job ads.""")
+                                            A random word cloud shown as a placeholder, generated using words from the lorem package. 
+                                             The app will generate a word  cloud of the most used words in your text. 
+                                             The word cloud will be used to match your skills with the job ads.""")
 
     your_true_stack_text_ = st.text_input(label="", value="",
                                           key=f"your_stack_text_")
