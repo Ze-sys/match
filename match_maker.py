@@ -196,7 +196,7 @@ def main():
                 f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills (Go to the job ad 👉 "} {job_title})</span>',
                 unsafe_allow_html=True)
             cols[1].markdown(
-                f'<img src="data:image/png;base64,{base64.b64encode(open("png/job_cloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
+                f'<img src="data:image/png;base64,{base64.b64encode(open("png/job_cloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
                 unsafe_allow_html=True)
 
             cols[2].markdown(f'<span style="font-size:16px;border-radius:0%;">Your Skills </span>',
@@ -204,11 +204,11 @@ def main():
 
             if your_true_stack_text_ != "":
                 cols[2].markdown(
-                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/your_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
+                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/your_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
                     unsafe_allow_html=True)
             else:
                 cols[2].markdown(
-                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/lorem_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
+                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/lorem_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
                     unsafe_allow_html=True)
 
             st.markdown(f'<h6 style="background-color:#754DF3;"></h6>', unsafe_allow_html=True)
