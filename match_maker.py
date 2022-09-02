@@ -90,7 +90,7 @@ def get_job_description(request_info_):
 def main():
     st.title("Match Maker")
     st.subheader("Attempts to match skills to relevant job postings...")
-    st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the available job ads. The number of jobs queried can be set in the sidebar. 
+    st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the available job ads. The total number of jobs queried (number of jobs per query + number of pages)can be set in the sidebar. 
     The app uses the job description from user selected rows in the table below to generate a word cloud of the most used (default 15) words. And then, it 
     tries to evaluate the match the user's skills with those in the job ad. Copy your stack/skills list in the text box  and let the app build your word cloud. 
     By default, the first 3 jobs are are used to build word clouds. This  can be changed by adding/removing  jobs from the table.
@@ -99,7 +99,7 @@ def main():
     """)
     
 
-    jobs_per_query=st.sidebar.selectbox('Select number of jobs per query (default is 10. Bigger numbers take longer to get response. Smaller numbers result in more round trips to the aip. Make your call!', 
+    jobs_per_query=st.sidebar.selectbox('Select number of jobs per query (default is 10. Bigger numbers take longer to get response. Smaller numbers result in more round trips to the aip server. Make your call!', 
                          [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], index=0)
     
     url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?page=1&pageSize={jobs_per_query}'
