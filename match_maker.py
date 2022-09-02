@@ -10,7 +10,7 @@ import plotly.express as px
 from wordcloud import WordCloud, STOPWORDS
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode, JsCode
 
-st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Match Maker")
+st.set_page_config(layout="wide", initial_sidebar_state="collapsed", page_title="Match Maker")
 
 keywords = [
     'Data', 'Data Scientist', 'Data Engineer', 'Data Analyst', 'Data Architect', 'Data Science',
@@ -24,13 +24,73 @@ wordcloud = WordCloud(stopwords=STOPWORDS, max_font_size=50, max_words=15, backg
                       collocations=False, random_state=1).generate(your_ideal_stack_text[0])
 wordcloud.to_file("png/lorem_stack_wordcloud.png")
 
+@st.cache
+def get_job_description(request_info_):
+    """
+    This function takes in a dataframe and adds a string of the job description column.
+    Shaky stuff since the html parser is not very robust
+    """
+    df_ = pd.DataFrame()
+    for i_ in range(len(request_info_['data'])):
+        dict_ = {k: request_info_['data'][i_].get(k) for k in
+                    ['title', 'locations', 'publishDate', 'employer', 'url']}
+        dict_.update({'locations': '{}, {}'.format(request_info_['data'][0].get('locations')[0].get('description'),
+                                                    request_info_['data'][0].get('locations')[-1].get('type')),
+                        'employer': request_info_['data'][i_].get('employer').get('name')})
+        df_ = df_.append(dict_, ignore_index=True)
+
+    for i_, url_ in enumerate(df_.url):
+        job_url = f'https://www.bcjobs.ca{url_}'
+        r = requests.get(job_url)
+        soup = bs.BeautifulSoup(r.text, 'lxml')
+        meta_data = soup.find('div', class_="clearfix u_mt-md")
+        try:
+            salary_amount= meta_data.text.split('Salary')[1].strip().split('\n')[0].strip()
+        except IndexError:
+            salary_amount = 'N/A'
+            pass
+
+        try:
+            location= meta_data.text.split('Location')[1].strip().split('\n')[0].strip()
+        except IndexError:
+            location = 'N/A'
+            pass
+
+        try:
+            position_type, posted = meta_data.text.split('Details')[1].strip().split(
+                '\n\n\n')  # get the position type and posted date
+        except ValueError:
+            position_type, posted = 'N/A', 'N/A'
+            pass
+
+        try:
+            category = soup.find_all('a',class_="rf_tag u_mb-xxs u_mr-xxs")[-1].text.strip('\n')
+        except IndexError:
+            category = 'N/A'
+            pass
+
+
+        df_.loc[i_, 'position'] = position_type
+        df_.loc[i_, 'location'] = location
+        df_.loc[i_, 'posted'] = posted.strip()
+        job_desc = soup.find('div', class_='clearfix u_text--90 u_mb-base u_overflow-hidden').text
+        df_.loc[i_, 'job_description'] = job_desc
+        df_.loc[i_, 'job_url'] = job_url
+        df_.loc[i_, 'category'] = category
+        df_.loc[i_, 'salary'] = salary_amount
+
+        
+
+    df_.drop(columns=['url'], inplace=True)
+
+    return df_
 
 
 
 def main():
     st.title("Match Maker")
     st.subheader("Attempts to match skills to relevant job postings...")
-    st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the latest job ads. 
+    st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the available job ads. The number of jobs queried can be set in the sidebar. 
     The app uses the job description from user selected rows in the table below to generate a word cloud of the most used (default 15) words. And then, it 
     tries to evaluate the match the user's skills with those in the job ad. Copy your stack/skills list in the text box  and let the app build your word cloud. 
     By default, the first 3 jobs are are used to build word clouds. This  can be changed by adding/removing  jobs from the table.
@@ -115,66 +175,6 @@ def main():
     def make_clickable(url_):
         return '<a href="{}" target="_blank">Link to job ad</a>'.format(url)
 
-    @st.cache
-    def get_job_description(request_info_):
-        """
-        This function takes in a dataframe and adds a string of the job description column.
-        Shaky stuff since the html parser is not very robust
-        """
-        df_ = pd.DataFrame()
-        for i_ in range(len(request_info_['data'])):
-            dict_ = {k: request_info_['data'][i_].get(k) for k in
-                     ['title', 'locations', 'publishDate', 'employer', 'url']}
-            dict_.update({'locations': '{}, {}'.format(request_info_['data'][0].get('locations')[0].get('description'),
-                                                       request_info_['data'][0].get('locations')[-1].get('type')),
-                          'employer': request_info_['data'][i_].get('employer').get('name')})
-            df_ = df_.append(dict_, ignore_index=True)
-
-        for i_, url_ in enumerate(df_.url):
-            job_url = f'https://www.bcjobs.ca{url_}'
-            r = requests.get(job_url)
-            soup = bs.BeautifulSoup(r.text, 'lxml')
-            meta_data = soup.find('div', class_="clearfix u_mt-md")
-            try:
-                salary_amount= meta_data.text.split('Salary')[1].strip().split('\n')[0].strip()
-            except IndexError:
-                salary_amount = 'N/A'
-                pass
-
-            try:
-                location= meta_data.text.split('Location')[1].strip().split('\n')[0].strip()
-            except IndexError:
-                location = 'N/A'
-                pass
-
-            try:
-                position_type, posted = meta_data.text.split('Details')[1].strip().split(
-                    '\n\n\n')  # get the position type and posted date
-            except ValueError:
-                position_type, posted = 'N/A', 'N/A'
-                pass
-
-            try:
-                category = soup.find_all('a',class_="rf_tag u_mb-xxs u_mr-xxs")[-1].text.strip('\n')
-            except IndexError:
-                category = 'N/A'
-                pass
-
-
-            df_.loc[i_, 'position'] = position_type
-            df_.loc[i_, 'location'] = location
-            df_.loc[i_, 'posted'] = posted.strip()
-            job_desc = soup.find('div', class_='clearfix u_text--90 u_mb-base u_overflow-hidden').text
-            df_.loc[i_, 'job_description'] = job_desc
-            df_.loc[i_, 'job_url'] = job_url
-            df_.loc[i_, 'category'] = category
-            df_.loc[i_, 'salary'] = salary_amount
-
-            
-
-        df_.drop(columns=['url'], inplace=True)
-
-        return df_
 
     request_info = make_api_call(url)
     df = get_job_description(request_info)
@@ -194,6 +194,7 @@ def main():
             break
 
 
+    tot_jobs_queried = len(df)
 
     filters = st.multiselect("Select phrases", keywords, default=None)
 
@@ -217,7 +218,7 @@ def main():
         st.stop()
     else:
         st.info(f"""Ⓘ As of {datetime.datetime.today().date()}, there are
-    {request_info['paging'].get('total')} jobs in the database. {len(df)} job(s) found based on the filters used.
+    {request_info['paging'].get('total')} jobs in the database. A total {tot_jobs_queried } jobs queried. {len(df)} job(s) found based on the filters used.
                  """)
 
     def xy(df_):
@@ -251,7 +252,6 @@ def main():
             enable_enterprise_modules=enable_enterprise_modules
         )
 
-        smd = grid_response_models['data']
         selected_rows_ = grid_response_models['selected_rows']
 
         df_show = pd.DataFrame(selected_rows_)
@@ -262,9 +262,6 @@ def main():
 
         category_counts = df.groupby('category').count().sort_values(by='title', ascending=False)
         AgGrid(category_counts.T.head(1),fit_columns_on_grid_load=True,height=60)
-
-        # category_counts_time_series = df.groupby(['publishDate']).count().sort_values(by='category', ascending=False)
-        # AgGrid(category_counts_time_series.T.head(1),fit_columns_on_grid_load=True,height=60)
         
         fig = px.bar(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'])
    
@@ -301,8 +298,7 @@ def main():
     word_max = st.slider('Wordcloud Max', min_value=10, max_value=45, value=15, step=5)
 
     st.write(f"""Copy text containing your skills, experience, etc. in the text box below. 
-                                            A random word cloud shown as a placeholder, generated using words from the lorem package. 
-                                             The app will generate a word  cloud of the most used words in your text. 
+                                             The app will generate a word  cloud of the most common words in your text. 
                                              The word cloud will be used to match your skills with the job ads.""")
 
     your_true_stack_text_ = st.text_input(label="Copy your text 👇", value="",
@@ -352,10 +348,8 @@ def main():
             st.markdown(f'<h6 style="background-color:#754DF3;"></h6>', unsafe_allow_html=True)
 
 
-    st.info(f"""Ⓘ This app is still in development. The api url used is https://www.bcjobs.ca/api/v1.1/public/jobs?. 
-    It does not require any authentication. As of {datetime.datetime.today().date()}, there are
-    {request_info['paging'].get('total')} jobs.
-    """)
+    st.info(f"""Ⓘ This app is still under development. 
+            """)
 
 
 
