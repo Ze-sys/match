@@ -127,9 +127,14 @@ def main():
 
     filters = "|".join([x.replace(" ", "") for x in filters if x])
 
-    add_your_own_keywords = st.text_input("Add your own key word(s). eg., Data Developer", value="")
+    add_your_own_keywords = st.text_input("Add your own key word(s) separated by a comma. eg., Data Developer, Database Administrator", value="")
     if add_your_own_keywords:
-        filters += "|" + add_your_own_keywords.replace(" ", "")
+        for x in add_your_own_keywords.split(","):
+            if x:
+                filters +=   x.replace(" ", "") + "|" 
+
+    filters = filters.strip("|")  # remove the last pipe
+    st.write(filters)   
 
     df = df[df['job_description'].apply(lambda x: x.replace(" ", "")).str.contains(filters, case=False,
                                                                                    regex=True)].reset_index(drop=True)
