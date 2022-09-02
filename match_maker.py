@@ -1,14 +1,12 @@
 import json
-import time
 import lorem
 import base64
 import datetime
 import requests
 import bs4 as bs
 import pandas as pd
-from PIL import Image
 import streamlit as st
-import matplotlib.pyplot as plt
+import plotly.express as px
 from wordcloud import WordCloud, STOPWORDS
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode, JsCode
 
@@ -34,7 +32,7 @@ def main():
     st.subheader("Attempts to match skills to relevant job postings...")
     st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the latest job ads. 
     The app uses the job description from user selected rows in the table below to generate a word cloud of the most used (default 15) words. And then, it 
-    tries to evaluate the match between the user's skills with those in the job ad. Please, copy your stack/skills list in the textbox  and let the app build your word cloud. 
+    tries to evaluate the match the user's skills with those in the job ad. Copy your stack/skills list in the text box  and let the app build your word cloud. 
     By default, the first 3 jobs are are used to build word clouds. This  can be changed by adding/removing  jobs from the table.
     See if there is a visual match. Will come up with a similarity score later... 
     Maybe a Hu Moments based similarity  between the two word cloud images ? 
@@ -46,7 +44,7 @@ def main():
     
     url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?page=1&pageSize={jobs_per_query}'
 
-    max_number_of_pages_to_query = st.sidebar.slider('Max number of pages to query', min_value=1, max_value=100, value=10, step=1)
+    max_number_of_pages_to_query = st.sidebar.slider('Max number of pages to query (default is 5)', min_value=1, max_value=100, value=5, step=1)
 
 
 
@@ -187,7 +185,7 @@ def main():
 
     while request_info['paging'].get('page') < max_number_of_pages_to_query:  # get the next 10 pages of job ads
         request_info = make_api_call(request_info['paging'].get('next'))
-        latest_iteration.text(f'fetching page {request_info["paging"].get("page")} of {max_number_of_pages_to_query}')
+        latest_iteration.text(f'Loading page {request_info["paging"].get("page")} of {max_number_of_pages_to_query}...')
         prog_bar.progress(0 + request_info['paging'].get('page') / max_number_of_pages_to_query)
             
         df = df.append(get_job_description(request_info), ignore_index=True)
@@ -197,7 +195,7 @@ def main():
 
 
 
-    filters = st.multiselect("Select phrases", keywords, default='Data Scientist')
+    filters = st.multiselect("Select phrases", keywords, default=None)
 
     filters = "|".join([x.replace(" ", "") for x in filters if x]) + "|"
 
@@ -226,9 +224,9 @@ def main():
         return [f'[{title}]({job_url})' for title, job_url in zip(df_.title, df_.job_url)]
 
 
-    job_xpdr = st.expander('Latest Jobs', expanded=True)
+    job_xpdr = st.expander('Jobs', expanded=True)
 
-    cols = job_xpdr.columns([4, 2, 2, 2, 2, 2, 2])  # (len(df.columns)+4)
+    cols = job_xpdr.columns([4, 2, 2, 2, 2, 2, 2]) 
 
    
     with job_xpdr:
@@ -258,6 +256,44 @@ def main():
 
         df_show = pd.DataFrame(selected_rows_)
 
+    barcharts_xpdr = st.expander('Jobs by category', expanded=False)
+
+    with barcharts_xpdr:
+
+        category_counts = df.groupby('category').count().sort_values(by='title', ascending=False)
+        AgGrid(category_counts.T.head(1),fit_columns_on_grid_load=True,height=60)
+
+        # category_counts_time_series = df.groupby(['publishDate']).count().sort_values(by='category', ascending=False)
+        # AgGrid(category_counts_time_series.T.head(1),fit_columns_on_grid_load=True,height=60)
+        
+        fig = px.bar(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'])
+   
+        fig.update_layout(
+            xaxis = dict(
+                    showgrid = True,
+                    showticklabels = False,
+                ),
+            title = '',
+            xaxis_title = 'category',
+            yaxis_title = 'number of jobs',
+            font=dict(
+                family="Times New Roman",
+                size=18,
+                color="#7f7f7f"
+            ),
+            legend_title_text='category',
+            legend=dict(
+                yanchor="top",
+                y=2,
+                xanchor="left",
+                x=0.01,
+                orientation="h"
+             ),
+        )
+          
+        st.plotly_chart(fig, use_container_width=True)
+      
+
 
     st.markdown(
         f'<h6 style="color:white;font-size:24px;border-radius:0%;background-color:#754DF3;">Job Summaries & Wordclouds<br></h6></br>',
@@ -269,7 +305,7 @@ def main():
                                              The app will generate a word  cloud of the most used words in your text. 
                                              The word cloud will be used to match your skills with the job ads.""")
 
-    your_true_stack_text_ = st.text_input(label="", value="",
+    your_true_stack_text_ = st.text_input(label="Copy your text 👇", value="",
                                           key=f"your_stack_text_")
 
     if your_true_stack_text_ != "":
@@ -279,7 +315,11 @@ def main():
         your_true_stack_wordcloud.to_file("png/your_stack_wordcloud.png")
 
     for i in range(min(5,len(df_show))):
-        cols = st.columns([1.45, 1.25, 1.25])
+        job_link_container = st.container()
+        def job_link(x):
+            return  f"""[![Go to job](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]({x})""",
+
+        cols = st.columns([1.25, 1.25, 1.25])
         job_title = xy(df[['title', 'job_url']].iloc[i:i + 1])[0]
 
         text_ = cols[0].text_area(label="Job Summary", value=df_show['job_description'].values[i], height=250,
@@ -289,6 +329,7 @@ def main():
             wordcloud = WordCloud(stopwords=STOPWORDS, max_font_size=50, max_words=word_max, background_color="#F1F1F1",
                                   colormap='Set2', collocations=False, random_state=1).generate(text_)
             wordcloud.to_file("png/job_cloud.png")
+
             cols[1].markdown(
                 f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills"} ({job_title})</span>',
                 unsafe_allow_html=True)
@@ -301,11 +342,11 @@ def main():
 
             if your_true_stack_text_ != "":
                 cols[2].markdown(
-                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/your_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
+                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/your_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="525" height="250">',
                     unsafe_allow_html=True)
             else:
                 cols[2].markdown(
-                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/lorem_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
+                    f'<img src="data:image/png;base64,{base64.b64encode(open("png/lorem_stack_wordcloud.png", "rb").read()).decode()}" alt="word cloud" width="525" height="250">',
                     unsafe_allow_html=True)
 
             st.markdown(f'<h6 style="background-color:#754DF3;"></h6>', unsafe_allow_html=True)
@@ -315,6 +356,7 @@ def main():
     It does not require any authentication. As of {datetime.datetime.today().date()}, there are
     {request_info['paging'].get('total')} jobs.
     """)
+
 
 
 if __name__ == "__main__":
