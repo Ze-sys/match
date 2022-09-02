@@ -182,7 +182,7 @@ def main():
         your_true_stack_wordcloud.to_file("png/your_stack_wordcloud.png")
 
     for i in range(len(df)):
-        cols = st.columns([1.5, 1.25, 1.25])
+        cols = st.columns([1.45, 1.25, 1.25])
         job_title = df['title'].values[i]
 
         text_ = cols[0].text_area(label="Job Summary", value=df['job_description'].values[i], height=250,
@@ -193,7 +193,7 @@ def main():
                                   colormap='Set2', collocations=False, random_state=1).generate(text_)
             wordcloud.to_file("png/job_cloud.png")
             cols[1].markdown(
-                f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills (Go to the job ad 👉 "} {job_title})</span>',
+                f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills"} ({job_title})</span>',
                 unsafe_allow_html=True)
             cols[1].markdown(
                 f'<img src="data:image/png;base64,{base64.b64encode(open("png/job_cloud.png", "rb").read()).decode()}" alt="word cloud" width="550" height="250">',
