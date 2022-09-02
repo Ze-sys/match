@@ -134,7 +134,6 @@ def main():
                 filters +=   x.replace(" ", "") + "|" 
 
     filters = filters.strip("|")  # remove the last pipe
-    st.write(filters)   
 
     df = df[df['job_description'].apply(lambda x: x.replace(" ", "")).str.contains(filters, case=False,
                                                                                    regex=True)].reset_index(drop=True)
