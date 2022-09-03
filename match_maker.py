@@ -10,7 +10,7 @@ import plotly.express as px
 from wordcloud import WordCloud, STOPWORDS
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode, JsCode
 
-st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Match Maker")
+st.set_page_config(layout="wide", initial_sidebar_state="collapsed", page_title="Match Maker")
 
 keywords = [
     'Data', 'Data Scientist', 'Data Engineer', 'Data Analyst', 'Data Architect', 'Data Science',
@@ -147,7 +147,7 @@ def main():
     enable_pagination = st.sidebar.checkbox("Enable pagination", value=False)
     if enable_pagination:
         st.sidebar.subheader("Pagination options")
-        paginationAutoSize = st.sidebar.checkbox("Auto pagination size", value=True)
+        paginationAutoSize = st.sidebar.checkbox("Auto pagination size", value=False)
         if not paginationAutoSize:
             paginationPageSize = st.sidebar.number_input("Page size", value=5, min_value=0, max_value=100)
         st.sidebar.text("___")
@@ -183,7 +183,7 @@ def main():
     latest_iteration = st.empty()
     prog_bar = st.progress(0)
 
-    while request_info['paging'].get('page') < max_number_of_pages_to_query:  # get the next 10 pages of job ads
+    while request_info['paging'].get('page') < max_number_of_pages_to_query:  # get the next max_number_of_pages_to_query  of job ads
         request_info = make_api_call(request_info['paging'].get('next'))
         latest_iteration.text(f'Loading page {request_info["paging"].get("page")} of {max_number_of_pages_to_query}...')
         prog_bar.progress(0 + request_info['paging'].get('page') / max_number_of_pages_to_query)
@@ -234,10 +234,14 @@ def main():
         gb_models.configure_grid_options(domLayout='normal')
         gb_models.configure_column("title", headerCheckboxSelection = True)
         gb_models.configure_selection('multiple', use_checkbox=True, pre_selected_rows=[0, 1, 2]) # show the first 3 rows as selected for wordcloud
-        gb_models.configure_pagination(paginationAutoPageSize=True)
+        gb_models.configure_pagination(paginationAutoPageSize=False)
+        gb_models.configure_side_bar(enable_sidebar)
+        gb_models.configure_default_column(groupable=True, value=True, enableRowGroup=True, aggFunc='sum')
+
 
 
         gridOptions_models = gb_models.build()
+
         grid_response_models = AgGrid(
             df, 
             gridOptions=gridOptions_models,
@@ -262,7 +266,7 @@ def main():
         # AgGrid(category_counts.T.head(1),fit_columns_on_grid_load=True,height=60)
         
         fig = px.histogram(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'], barmode='stack', text_auto='.2s')
-        fig.update_traces(textfont_size=20, textangle=0, textposition="outside", cliponaxis=False)
+        fig.update_traces(textfont_size=18, textangle=0, textposition="outside", cliponaxis=False)
         
         fig.update_layout(
             paper_bgcolor = 'rgba(0,0,0,0)',
