@@ -260,7 +260,7 @@ def main():
 
     with barcharts_xpdr:
 
-        fig = px.histogram(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'], barmode='stack', text_auto='.2s')
+        fig = px.histogram(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'], barmode='stack', text_auto='.0s')
         fig.update_traces(textfont_size=18, textangle=0, textposition="outside", cliponaxis=False)
         
         fig.update_layout(
