@@ -105,7 +105,7 @@ def main():
     
     url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?page=0&pageSize={jobs_per_query}'
 
-    max_number_of_pages_to_query = st.sidebar.slider('Max number of pages to query (default is 5)', min_value=1, max_value=100, value=5, step=1)
+    max_number_of_pages_to_query = st.sidebar.slider('Max number of pages to query (default is 10)', min_value=1, max_value=100, value=10, step=1)
 
 
 
@@ -237,7 +237,7 @@ def main():
         gb_models.configure_pagination(paginationAutoPageSize=False)
         gb_models.configure_side_bar(enable_sidebar)
         gb_models.configure_default_column(groupable=True, value=True, enableRowGroup=True, aggFunc='sum')
-
+        
         gridOptions_models = gb_models.build()
 
         grid_response_models = AgGrid(
@@ -252,9 +252,9 @@ def main():
             enable_enterprise_modules=enable_enterprise_modules
         )
 
-        selected_rows_ = grid_response_models['selected_rows']
+    selected_rows_ = grid_response_models['selected_rows']
 
-        df_show = pd.DataFrame(selected_rows_)
+    df_show = pd.DataFrame(selected_rows_)
 
     barcharts_xpdr = st.expander('Jobs by category', expanded=False)
 
