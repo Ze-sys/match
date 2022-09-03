@@ -1,4 +1,6 @@
 import json
+from tkinter import font
+from turtle import tiltangle
 import lorem
 import base64
 import datetime
@@ -10,7 +12,7 @@ import plotly.express as px
 from wordcloud import WordCloud, STOPWORDS
 from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode, JsCode
 
-st.set_page_config(layout="wide", initial_sidebar_state="collapsed", page_title="Match Maker")
+st.set_page_config(layout="wide", initial_sidebar_state="expanded", page_title="Match Maker")
 
 keywords = [
     'Data', 'Data Scientist', 'Data Engineer', 'Data Analyst', 'Data Architect', 'Data Science',
@@ -102,7 +104,7 @@ def main():
     jobs_per_query=st.sidebar.selectbox('Select number of jobs per query (default is 10. Bigger numbers take longer to get response. Smaller numbers result in more round trips to the aip server. Make your call!', 
                          [10, 20, 30, 40, 50, 60, 70, 80, 90, 100], index=0)
     
-    url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?page=1&pageSize={jobs_per_query}'
+    url = f'https://www.bcjobs.ca/api/v1.1/public/jobs?page=0&pageSize={jobs_per_query}'
 
     max_number_of_pages_to_query = st.sidebar.slider('Max number of pages to query (default is 5)', min_value=1, max_value=100, value=5, step=1)
 
@@ -187,8 +189,6 @@ def main():
         request_info = make_api_call(request_info['paging'].get('next'))
         latest_iteration.text(f'Loading page {request_info["paging"].get("page")} of {max_number_of_pages_to_query}...')
         prog_bar.progress(0 + request_info['paging'].get('page') / max_number_of_pages_to_query)
-            
-        df = df.append(get_job_description(request_info), ignore_index=True)
         df = pd.concat([df,get_job_description(request_info)], ignore_index=True)
         if request_info['paging'].get('next') is None:
             break
@@ -260,32 +260,42 @@ def main():
 
     with barcharts_xpdr:
 
-        category_counts = df.groupby('category').count().sort_values(by='title', ascending=False)
-        AgGrid(category_counts.T.head(1),fit_columns_on_grid_load=True,height=60)
+        # category_counts = df.groupby('category').count().sort_values(by='title', ascending=False)
+        # AgGrid(category_counts.T.head(1),fit_columns_on_grid_load=True,height=60)
         
-        fig = px.bar(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'])
-   
+        fig = px.histogram(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'], barmode='stack', text_auto='.2s')
+        fig.update_traces(textfont_size=20, textangle=0, textposition="outside", cliponaxis=False)
+        
         fig.update_layout(
+            paper_bgcolor = 'rgba(0,0,0,0)',
+            width=900,
+            height=600,
             xaxis = dict(
                     showgrid = True,
                     showticklabels = False,
+                    tickangle=0,
+                    tickfont=dict(
+                        size=18),
                 ),
-            title = '',
-            xaxis_title = 'category',
-            yaxis_title = 'number of jobs',
+            title = 'Jobs by Category',
+            xaxis_title = 'Category',
+            yaxis_title = 'Number of jobs',
             font=dict(
                 family="Times New Roman",
                 size=18,
-                color="#7f7f7f"
+                # color="#7f7f7f"
             ),
-            legend_title_text='category',
+            legend_title_text='Category',
             legend=dict(
                 yanchor="top",
-                y=2,
+                y=1,
                 xanchor="left",
-                x=0.01,
-                orientation="h"
+                x=1,
+                orientation="v",
+                font=dict(size=12
+                )
              ),
+            # showlegend=False,
         )
           
         st.plotly_chart(fig, use_container_width=True)

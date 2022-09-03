@@ -8,5 +8,5 @@ streamlit==1.12.2
 wordcloud==1.8.1
 lxml==4.9.1
 streamlit-aggrid==0.2.2.post4
-plotly==5.2.1
+plotly==5.10.0
 
