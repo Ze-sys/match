@@ -90,10 +90,11 @@ def get_job_description(request_info_):
 def main():
     st.title("Match Maker")
     st.subheader("Attempts to match skills to relevant job postings...")
-    st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the available job ads. The total number of jobs queried (number of jobs per query + number of pages) can be set from the sidebar on the left. 
+    st.markdown(f"""This app is a simple job matching tool that uses the bcjobs.ca API to query the available job ads. The total number of jobs queried 
+    (number of jobs per query + number of pages) can be set from the sidebar on the left. 
     The app uses the job description from user selected rows in the table below to generate a word cloud of the most used (default 15) words. And then, it 
-    tries to evaluate the match the user's skills with those in the job ad. Copy your stack/skills list in the text box  and let the app build your word cloud. 
-    By default, the first 3 jobs are are used to build word clouds. This  can be changed by adding/removing  jobs from the table.
+    tries to evaluate the match between user's skills with those in the job ad. Copy your stack/skills list in the text box  and let the app build your word cloud. 
+    By default, the first 3 jobs are are used to build word clouds. This  can be changed by adding/removing  jobs from the list.
     See if there is a visual match. Will come up with a similarity score later... 
     Maybe a Hu Moments based similarity  between the two word cloud images ? 
     """)
@@ -125,7 +126,7 @@ def main():
         enable_sidebar = False
 
     #features
-    fit_columns_on_grid_load = st.sidebar.checkbox("Fit Grid Columns on Load")
+    fit_columns_on_grid_load = st.sidebar.checkbox("Fit Grid Columns on Load", value=True)
 
     enable_selection=st.sidebar.checkbox("Enable row selection", value=True)
     if enable_selection:
@@ -153,7 +154,6 @@ def main():
         st.sidebar.text("___")
 
     #------------end AgGrid settings------------------------------
-
 
 
     def make_api_call(url):
@@ -223,7 +223,7 @@ def main():
         return [f'[{title}]({job_url})' for title, job_url in zip(df_.title, df_.job_url)]
 
 
-    job_xpdr = st.expander('Jobs', expanded=True)
+    job_xpdr = st.expander('Click here to see the jobs list', expanded=False)
 
     cols = job_xpdr.columns([4, 2, 2, 2, 2, 2, 2]) 
 
@@ -237,8 +237,6 @@ def main():
         gb_models.configure_pagination(paginationAutoPageSize=False)
         gb_models.configure_side_bar(enable_sidebar)
         gb_models.configure_default_column(groupable=True, value=True, enableRowGroup=True, aggFunc='sum')
-
-
 
         gridOptions_models = gb_models.build()
 
@@ -262,9 +260,6 @@ def main():
 
     with barcharts_xpdr:
 
-        # category_counts = df.groupby('category').count().sort_values(by='title', ascending=False)
-        # AgGrid(category_counts.T.head(1),fit_columns_on_grid_load=True,height=60)
-        
         fig = px.histogram(df, x='category', color='category', color_discrete_sequence=px.colors.qualitative.Dark24, hover_data=['title', 'salary','posted'], barmode='stack', text_auto='.2s')
         fig.update_traces(textfont_size=18, textangle=0, textposition="outside", cliponaxis=False)
         
@@ -329,17 +324,19 @@ def main():
 
         cols = st.columns([1.25, 1.25, 1.25])
         job_title = xy(df[['title', 'job_url']].iloc[i:i + 1])[0]
-
+       
         text_ = cols[0].text_area(label="Job Summary", value=df_show['job_description'].values[i], height=250,
                                   key=f"input_area_key_{i}")
-
+        cols[0].markdown(
+                f'<span style="font-size:16px;border-radius:0%;"> {"Ad link: "}{job_title}</span>',
+                unsafe_allow_html=True)
         if text_:
             wordcloud = WordCloud(stopwords=STOPWORDS, max_font_size=50, max_words=word_max, background_color="#F1F1F1",
                                   colormap='Set2', collocations=False, random_state=1).generate(text_)
             wordcloud.to_file("png/job_cloud.png")
 
             cols[1].markdown(
-                f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills"} ({job_title})</span>',
+                f'<span style="font-size:16px;border-radius:0%;"> {"Required Skills"}</span>',
                 unsafe_allow_html=True)
             cols[1].markdown(
                 f'<img src="data:image/png;base64,{base64.b64encode(open("png/job_cloud.png", "rb").read()).decode()}" alt="word cloud" width="500" height="250">',
