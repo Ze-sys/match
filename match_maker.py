@@ -223,7 +223,7 @@ def main():
         return [f'[{title}]({job_url})' for title, job_url in zip(df_.title, df_.job_url)]
 
 
-    job_xpdr = st.expander('Click here to see the jobs list', expanded=False)
+    job_xpdr = st.expander('Click here to see the jobs list', expanded=True)
 
     cols = job_xpdr.columns([4, 2, 2, 2, 2, 2, 2]) 
 
