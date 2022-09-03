@@ -1,6 +1,4 @@
 import json
-from tkinter import font
-from turtle import tiltangle
 import lorem
 import base64
 import datetime
