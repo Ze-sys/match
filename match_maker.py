@@ -24,7 +24,7 @@ wordcloud = WordCloud(stopwords=STOPWORDS, max_font_size=50, max_words=15, backg
                       collocations=False, random_state=1).generate(your_ideal_stack_text[0])
 wordcloud.to_file("png/lorem_stack_wordcloud.png")
 
-@st.cache
+@st.cache_data
 def get_job_description(request_info_):
     """
     This function takes in a dataframe and adds a string of the job description column.
@@ -37,7 +37,7 @@ def get_job_description(request_info_):
         dict_.update({'locations': '{}, {}'.format(request_info_['data'][0].get('locations')[0].get('description'),
                                                     request_info_['data'][0].get('locations')[-1].get('type')),
                         'employer': request_info_['data'][i_].get('employer').get('name')})
-        df_ = df_.append(dict_, ignore_index=True)
+        df_ = pd.concat([df_, pd.DataFrame(dict_, index=[0])], ignore_index=True)
 
     for i_, url_ in enumerate(df_.url):
         job_url = f'https://www.bcjobs.ca{url_}'
