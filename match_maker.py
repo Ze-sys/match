@@ -256,7 +256,7 @@ def main():
 
     df_show = pd.DataFrame(selected_rows_)
 
-    barcharts_xpdr = st.expander('Jobs by category', expanded=False)
+    barcharts_xpdr = st.expander('Jobs by category', expanded=True)
 
     with barcharts_xpdr:
 
@@ -266,7 +266,7 @@ def main():
         fig.update_layout(
             paper_bgcolor = 'rgba(0,0,0,0)',
             width=900,
-            height=600,
+            height=400,
             xaxis = dict(
                     showgrid = True,
                     showticklabels = False,
@@ -292,8 +292,11 @@ def main():
                 font=dict(size=12
                 )
              ),
-            # showlegend=False,
+            margin=dict(l=20, r=20, t=50, b=20),
+            bargap=0.2, 
+            bargroupgap=0.1 
         )
+
           
         st.plotly_chart(fig, use_container_width=True)
       
